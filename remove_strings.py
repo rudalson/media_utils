@@ -1,4 +1,5 @@
 import os
+import re
 
 def remove_multiple_texts_in_files(directory, remove_list):
     """
@@ -20,7 +21,8 @@ def remove_multiple_texts_in_files(directory, remove_list):
 
                 # 리스트에 있는 문자열 모두 제거
                 for target_text in remove_list:
-                    content = content.replace(target_text, "")
+                    # content = content.replace(target_text, "")
+                    content = re.sub(re.escape(target_text), "", content, flags=re.IGNORECASE)
 
                 # 변경된 경우 저장
                 if content != original_content:
@@ -34,9 +36,9 @@ if __name__ == "__main__":
     directory_path = r"d:\\_Archives\\vrew영상들\\test\\"  # 디렉토리 경로 지정
      # 제거할 문자열들
     remove_targets = [
-        " (mouse clicking)",
-        " (snaps fingers)", 
-        " (keys clacking)", " (laughing)"," (inaudible)",
+        " (mouse clicking)", " (drum roll)", " (clicking sound)", " (whoosh sound effect)", " (whooshing sound)", " (chiming)",
+        " (snaps fingers)", " (crowd clapping)", " (gasps)", " (swoosh sound)", " (screen swooshes)", " (screen whooshes)", " (applause)", " (swooshing sound)", " (harp sound)",
+        " (keys clacking)", " (laughing)"," (inaudible)", " (clears throat)", " (sniffs)", " (dramatic music)", " (coins clinking)", " (chimes twinkling)", " (bell dinging)",
         " (chiming sound)", " (keyboard clacking)", " (instrumental music plays)", " (bell chiming)", " (keyboard clacks)", " (clicks tongue)"," (audience cheering and clapping)",
         " (keyboard keys clacking)", " (beep)", " (electronic sound effect)",  " (keyboard click)", " (chime)", " (electronic chime)", " (chime sounds)", " (keyboard clicks)",
         " (bell dings)", " (ding)", " (ball bounces)", " (chimes)", " (laugh)", " (typing)", " (upbeat music)", " (keyboard clicking)", " (soft instrumental music)", " (laughs)",
