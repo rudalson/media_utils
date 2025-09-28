@@ -36,14 +36,20 @@ if __name__ == "__main__":
     directory_path = r"d:\\_Archives\\vrew영상들\\test\\"  # 디렉토리 경로 지정
      # 제거할 문자열들
     remove_targets = [
-        " (mouse clicking)", " (drum roll)", " (clicking sound)", " (whoosh sound effect)", " (whooshing sound)", " (chiming)",
+        " (mouse clicking)", " (drum roll)", " (clicking sound)", " (whoosh sound effect)", " (whooshing sound)", " (chiming)", " (fanfare)", " (bell rings)", " (triumphant music)",
         " (snaps fingers)", " (crowd clapping)", " (gasps)", " (swoosh sound)", " (screen swooshes)", " (screen whooshes)", " (applause)", " (swooshing sound)", " (harp sound)",
         " (keys clacking)", " (laughing)"," (inaudible)", " (clears throat)", " (sniffs)", " (dramatic music)", " (coins clinking)", " (chimes twinkling)", " (bell dinging)",
         " (chiming sound)", " (keyboard clacking)", " (instrumental music plays)", " (bell chiming)", " (keyboard clacks)", " (clicks tongue)"," (audience cheering and clapping)",
         " (keyboard keys clacking)", " (beep)", " (electronic sound effect)",  " (keyboard click)", " (chime)", " (electronic chime)", " (chime sounds)", " (keyboard clicks)",
         " (bell dings)", " (ding)", " (ball bounces)", " (chimes)", " (laugh)", " (typing)", " (upbeat music)", " (keyboard clicking)", " (soft instrumental music)", " (laughs)",
         " (smacks lips)"," (inhales)", " (laughter)", " (whoosh)"," (sighs)", " (applauding)", " (outro music)", " (clapping)", " (breaths in)", " (applause)"
-        " (claps)", " (mouse click)", " (bell chimes)", " (Upbeat music playing)"
+        " (claps)", " (mouse click)", " (bell chimes)", " (Upbeat music playing)", " (sound effect)", " (mouse clicks)", " (echoes)", " (buzzer sounds)", " (notification chime)",
+        " (explosion sound)", " (sigh)", " (whispers)", " (typing sound)", " (popping sound)", " (screen whooshing)", " (computer trilling)", " (dog barks)", " (air whooshing)",
+        " (record scratch)", " (drum)", " (explosion)", " (screen chimes)", " (bell ringing)", " (techno music)", " (fail music)", " (electronic beep)", " (swoosh sound effect)",
+        " (ta-da sound)", " (scratching sound", " (gavel bang)", " (musical sting)", " (drum beat)", " (paper rustles)", " (squawk)", " (electronic beeps)", " (wrong buzzer)",
+        " (trumpet sound)", " (whimsical music)", " (buzzer)", " (victorious music)", " (robot beeps)", " (chuckles)", " (crowd gasps)", " (upbeat music plays)", " (computer sound)",
+        " (suspenseful music plays)", " (triumphant music plays)", " (instrumental music)", " (glass shatters)", " (scoffs)", " (keys clicking)", " (camera shutter clicks)", " (door slams)",
+        " (bell ding)", " (bell chime)", " (piano roll)",
     ]
 
     remove_multiple_texts_in_files(directory_path, remove_targets)
