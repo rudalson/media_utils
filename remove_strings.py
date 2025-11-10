@@ -49,7 +49,7 @@ if __name__ == "__main__":
         " (ta-da sound)", " (scratching sound", " (gavel bang)", " (musical sting)", " (drum beat)", " (paper rustles)", " (squawk)", " (electronic beeps)", " (wrong buzzer)",
         " (trumpet sound)", " (whimsical music)", " (buzzer)", " (victorious music)", " (robot beeps)", " (chuckles)", " (crowd gasps)", " (upbeat music plays)", " (computer sound)",
         " (suspenseful music plays)", " (triumphant music plays)", " (instrumental music)", " (glass shatters)", " (scoffs)", " (keys clicking)", " (camera shutter clicks)", " (door slams)",
-        " (bell ding)", " (bell chime)", " (piano roll)",
+        " (bell ding)", " (bell chime)", " (piano roll)", " (beeping)", " (beeps)", " (drum music)", " (phone ringing)", " (clicking)", " (clicks)",
     ]
 
     remove_multiple_texts_in_files(directory_path, remove_targets)
