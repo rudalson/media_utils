@@ -1,5 +1,8 @@
 {
     "remove_targets": [
+        " [audience applauding]",
+        " [audience laughing]",
+        " [audience laughs]",
         " [air whooshing]",
         " [applauding]",
         " [applause]",
@@ -39,6 +42,7 @@
         " [computer sound]",
         " [computer trilling]",
         " [coughs]",
+        " [crowd cheering]",
         " [crowd clapping]",
         " [crowd gasps]",
         " [ding]",
@@ -61,6 +65,7 @@
         " [gasps]",
         " [gavel bang]",
         " [glass shatters]",
+        " [gulps]",
         " [harp sound]",
         " [inaudible]",
         " [inhales]",
@@ -83,6 +88,7 @@
         " [mouse clicks]",
         " [musical sting]",
         " [notification chime]",
+        " [object clatters]",
         " [outro music]",
         " [paper rustles]",
         " [pause]",
@@ -125,6 +131,8 @@
         " [whoosh sound effect]",
         " [whoosh]",
         " [whooshing sound]",
+        " [writing]",
+        " [writing on chalkboard]",
         " [wrong buzzer]"
     ]
 }
