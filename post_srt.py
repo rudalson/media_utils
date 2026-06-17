@@ -42,10 +42,10 @@ def process_srt(directory):
             with open(new_path, 'w', encoding='utf-8') as f:
                 f.write(content)
             
-            print(f"✅ 완료: {srt_path.name}")
+            print(f"[OK] 완료: {srt_path.name}")
 
         except Exception as e:
-            print(f"❌ 실패: {srt_path.name} (사유: {e})")
+            print(f"[FAIL] 실패: {srt_path.name} (사유: {e})")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="자막 파일 추임새 정리 스크립트")

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SubTrans.ai - Gemini Subtitle Translator</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="glass-bg"></div>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo-area">
+                <span class="logo-glow"></span>
+                <h1 class="logo-text">SubTrans<span>.ai</span></h1>
+            </div>
+            <div class="status-controls">
+                <div id="key-status-badge" class="status-badge status-loading">
+                    <span class="badge-dot"></span>
+                    <span class="badge-text">Gemini API 확인 중...</span>
+                </div>
+                <button id="notify-perm-btn" class="btn-secondary">
+                    <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="currentColor"><path d="M160-200v-80h80v-280q0-83 50-147.5T420-792v-28q0-25 17.5-42.5T480-880q25 0 42.5 17.5T540-820v28q80 20 130 84.5T720-560v280h80v80H160Zm320-300Zm0 420q-33 0-56.5-23.5T400-160h160q0 33-23.5 56.5T480-80ZM320-280h320v-280q0-66-47-113t-113-47q-66 0-113 47t-47 113v280Z"/></svg>
+                    알림 켜기
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Grid -->
+        <main class="app-main">
+            <!-- Directory Input Card -->
+            <section class="card path-card">
+                <h2>로컬 작업 폴더 지정</h2>
+                <p class="description">SRT 파일들이 모여있는 로컬 디렉토리의 전체 경로를 입력해 주세요.</p>
+                <div class="path-input-group">
+                    <input type="text" id="dir-path-input" placeholder="예: C:\Users\SSAFY\repo\media_utils" autocomplete="off">
+                    <button id="scan-btn" class="btn-primary">
+                        <span>폴더 스캔</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="currentColor"><path d="M480-320q75 0 127.5-52.5T660-500q0-75-52.5-127.5T480-680q-75 0-127.5 52.5T300-500q0 75 52.5 127.5T480-320Zm0-80q-42 0-71-29t-29-71q0-42 29-71t71-29q42 0 71 29t29 71q0 42-29 71t-71 29Zm0 240q-79 0-149-30t-122.5-82.5Q156-345 126-275T96-120h80q0-125 87.5-212.5T476-420q125 0 212.5 87.5T776-120h80q0-79-30-149t-82.5-122.5Q681-345 611-375t-131-30Z"/></svg>
+                    </button>
+                </div>
+            </section>
+
+            <!-- File List Card -->
+            <section class="card files-card">
+                <div class="card-header">
+                    <h2>번역 대상 파일 목록</h2>
+                    <span id="file-count-label" class="badge-info">0개 발견</span>
+                </div>
+                
+                <div class="files-table-wrapper">
+                    <table class="files-table">
+                        <thead>
+                            <tr>
+                                <th>자막 파일명</th>
+                                <th class="text-right">파일 크기</th>
+                                <th class="text-right">자막 개수</th>
+                                <th>기본 모델</th>
+                                <th>대체(Fallback) 모델</th>
+                                <th class="text-center">작업</th>
+                            </tr>
+                        </thead>
+                        <tbody id="files-list-body">
+                            <tr>
+                                <td colspan="6" class="empty-state">
+                                    <svg xmlns="http://www.w3.org/2000/svg" height="40px" viewBox="0 -960 960 960" width="40px" fill="currentColor"><path d="M140-160q-24 0-42-18t-18-42v-520q0-24 18-42t42-18h300l80 80h300q24 0 42 18t18 42v520q0 24-18 42t-42 18H140Zm0-80h680v-400H480l-80-80H140v480Zm0 0v-480 480Z"/></svg>
+                                    <p>로컬 폴더 경로를 입력한 후 스캔해 주세요.</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Translation Dashboard Modal -->
+    <div id="progress-modal" class="modal-overlay">
+        <div class="modal-content card">
+            <div class="modal-header">
+                <div>
+                    <h3 id="modal-title">자막 번역 실행 중</h3>
+                    <p id="modal-subtitle" class="description">a.srt</p>
+                </div>
+                <button id="modal-close-btn" class="btn-icon" disabled>
+                    <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <!-- Progress Circular / Linear Bar -->
+                <div class="progress-container">
+                    <div class="progress-meta">
+                        <span id="progress-step-text">대기 중...</span>
+                        <span id="progress-percent-text">0%</span>
+                    </div>
+                    <div class="progress-bar-wrapper">
+                        <div id="progress-bar-fill" class="progress-bar-fill"></div>
+                    </div>
+                </div>
+
+                <!-- Terminal-like Console Logs -->
+                <div class="terminal-container">
+                    <div class="terminal-header">
+                        <span class="terminal-dot red"></span>
+                        <span class="terminal-dot yellow"></span>
+                        <span class="terminal-dot green"></span>
+                        <span class="terminal-title">PROCESS LOGS</span>
+                    </div>
+                    <div id="terminal-logs" class="terminal-logs">
+                        <div class="log-line info">자막 번역 프로세스를 대기 중입니다...</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <span id="status-summary-text" class="status-summary">진행 대기 중</span>
+                <button id="modal-action-btn" class="btn-primary" disabled>확인</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications Area -->
+    <div id="toast-area" class="toast-area"></div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
