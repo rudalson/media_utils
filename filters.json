@@ -1,6 +1,7 @@
 {
     "remove_targets": [
         " [audience applauding]",
+        " [audience clapping]",
         " [audience laughing]",
         " [audience laughs]",
         " [air whooshing]",
@@ -89,6 +90,7 @@
         " [musical sting]",
         " [notification chime]",
         " [object clatters]",
+        " [outro jingle]",
         " [outro music]",
         " [paper rustles]",
         " [pause]",
