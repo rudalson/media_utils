@@ -36,7 +36,7 @@ def process_srt(directory):
             # 2. 문장 시작 추임새 삭제
             content = p2.sub('', content)
             
-            new_filename = f"fixed_{srt_path.name}"
+            new_filename = f"_{srt_path.name}"
             new_path = srt_path.parent / new_filename
 
             with open(new_path, 'w', encoding='utf-8') as f:
