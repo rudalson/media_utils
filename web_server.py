@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from google.genai.errors import APIError
+import requests
+import typing
 
 # 프로젝트 내 타 스크립트 모듈 임포트
 import pre_srt
@@ -18,7 +20,7 @@ from verify_srt import parse_srt_content, verify_srt_files
 # .env 파일 로드
 load_dotenv()
 
-app = FastAPI(title="Gemini SRT Translator")
+app = FastAPI(title="Media Subtitle Translator")
 
 # 정적 파일 서빙 설정
 # static 디렉토리가 없으면 자동 생성
@@ -29,6 +31,8 @@ class TranslateRequest(BaseModel):
     file_path: str
     primary_model: str
     fallback_model: str
+    primary_provider: str = "gemini"   # 'gemini' or 'openrouter'
+    fallback_provider: str = "gemini"
 
 @app.get("/")
 def read_index():
@@ -36,9 +40,11 @@ def read_index():
 
 @app.get("/api/key_status")
 def check_key_status():
-    """Gemini API 키가 환경 변수 혹은 .env에 설정되어 있는지 확인합니다."""
-    key = os.environ.get("GEMINI_API_KEY")
-    return {"configured": bool(key)}
+    """각 모델 제공자별 API 키 설정 여부를 반환합니다."""
+    return {
+        "gemini": bool(os.environ.get("GEMINI_API_KEY")),
+        "openrouter": bool(os.environ.get("OPENROUTER_API_KEY"))
+    }
 
 @app.get("/api/default_directory")
 def get_default_directory():
@@ -126,6 +132,140 @@ def translate_chunk_with_gemini(client, model_name: str, chunk_blocks: list) -> 
     return parse_srt_content(translated_text)
 
 
+def translate_chunk_with_openrouter(api_key: str, base_url: typing.Optional[str], model_name: str, chunk_blocks: list, temperature: float = 0.2) -> list:
+    """OpenRouter-compatible HTTP endpoint로 단일 청크를 번역 요청합니다.
+
+    이 함수는 여러 OpenRouter 호환 엔드포인트 형태를 시도하여 가장 적합한 응답 필드를 추출하려고 합니다.
+    응답에서 텍스트 추출에 실패하면 예외를 발생시킵니다.
+    """
+    srt_input = ""
+    for b in chunk_blocks:
+        srt_input += f"{b['index']}\n{b['start']} --> {b['end']}\n{b['text']}\n\n"
+
+    system_instruction = (
+        "You are an expert subtitle translator. Translate the English subtitles into Korean.\n"
+        "Strict Guidelines:\n"
+        "1. Maintain a strict 1:1 match for indices and timestamps. Every block index and timestamp in the translation must match the source exactly (to the millisecond). Do not skip, merge, or change indices or time codes.\n"
+        "2. Translate into natural, polite conversational Korean using polite sentence endings like '~요' or '~습니다'. Never use informal language (반말/해라체).\n"
+        "3. Output ONLY the raw translated SRT text. Do not include markdown code fences (like ```), explanations, notes, or introductions."
+    )
+
+    prompt = f"Please translate the following SRT content into Korean, keeping the exact same structure and timestamps:\n\n{srt_input}"
+
+    # 기본 베이스 URL 선택
+    endpoints = []
+    if base_url:
+        # 사용자가 base_url을 제공하면 여러 후보 조합 시도
+        endpoints.extend([
+            base_url.rstrip('/') + '/responses',
+            base_url.rstrip('/') + '/v1/responses',
+            base_url.rstrip('/') + '/v1/chat/completions',
+            base_url.rstrip('/') + '/chat/completions',
+        ])
+    # 공용 OpenRouter 기본 엔드포인트
+    endpoints.extend([
+        'https://api.openrouter.ai/v1/responses',
+        'https://api.openrouter.ai/v1/chat/completions',
+        'https://api.openrouter.ai/v1/completions',
+    ])
+
+    headers = {
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json'
+    }
+
+    last_exc = None
+    for url in endpoints:
+        try:
+            # 시도 1: /responses 스타일
+            if url.endswith('/responses'):
+                body = {
+                    'model': model_name,
+                    'input': prompt,
+                    'temperature': temperature,
+                }
+                resp = requests.post(url, json=body, headers=headers, timeout=60)
+                resp.raise_for_status()
+                j = resp.json()
+                # OpenRouter /responses 응답에서 텍스트 찾기
+                # 예상: { output: [ { content: [ { type: 'output_text', text: '...' } ] } ] }
+                if isinstance(j, dict):
+                    out = None
+                    if 'output' in j and isinstance(j['output'], list) and j['output']:
+                        first = j['output'][0]
+                        if isinstance(first, dict) and 'content' in first and isinstance(first['content'], list):
+                            # join all text pieces
+                            texts = []
+                            for c in first['content']:
+                                if isinstance(c, dict) and 'text' in c:
+                                    texts.append(c['text'])
+                            if texts:
+                                out = '\n'.join(texts)
+                    if out:
+                        return parse_srt_content(out)
+
+            # 시도 2: /chat/completions 스타일
+            if 'chat.completions' in url:
+                messages = [
+                    { 'role': 'system', 'content': system_instruction },
+                    { 'role': 'user', 'content': prompt }
+                ]
+                body = {
+                    'model': model_name,
+                    'messages': messages,
+                    'temperature': temperature
+                }
+                resp = requests.post(url, json=body, headers=headers, timeout=60)
+                resp.raise_for_status()
+                j = resp.json()
+                # 일반적인 OpenAI형 응답 처리
+                if isinstance(j, dict) and 'choices' in j and isinstance(j['choices'], list) and j['choices']:
+                    text = None
+                    choice = j['choices'][0]
+                    if isinstance(choice, dict):
+                        if 'message' in choice and isinstance(choice['message'], dict) and 'content' in choice['message']:
+                            text = choice['message']['content']
+                        elif 'text' in choice:
+                            text = choice['text']
+                    if text:
+                        return parse_srt_content(text)
+
+            # 시도 3: /completions 스타일
+            if url.endswith('/completions') or url.endswith('/v1/completions'):
+                body = {
+                    'model': model_name,
+                    'prompt': system_instruction + '\n' + prompt,
+                    'temperature': temperature,
+                    'max_tokens': 2000
+                }
+                resp = requests.post(url, json=body, headers=headers, timeout=60)
+                resp.raise_for_status()
+                j = resp.json()
+                if isinstance(j, dict) and 'choices' in j and j['choices']:
+                    c = j['choices'][0]
+                    if isinstance(c, dict) and 'text' in c:
+                        return parse_srt_content(c['text'])
+
+        except Exception as e:
+            last_exc = e
+            # 다른 엔드포인트를 시도
+            continue
+
+    # 모든 시도 실패
+    raise Exception(f"OpenRouter 요청/파싱 실패. 마지막 오류: {last_exc}")
+
+
+def translate_chunk(provider: str, api_key: str, base_url: typing.Optional[str], model_name: str, chunk_blocks: list) -> list:
+    """플러그형 번역 호출. provider에 따라 내부 호출을 분기."""
+    if provider == 'gemini':
+        client = genai.Client(api_key=api_key)
+        return translate_chunk_with_gemini(client, model_name, chunk_blocks)
+    elif provider == 'openrouter':
+        return translate_chunk_with_openrouter(api_key, base_url, model_name, chunk_blocks)
+    else:
+        raise Exception(f"Unknown provider: {provider}")
+
+
 def verify_chunk(original_chunk: list, translated_chunk: list) -> bool:
     """단일 청크 내의 블록 개수, 인덱스, 타임스탬프 1:1 일치 여부를 검증합니다."""
     if len(original_chunk) != len(translated_chunk):
@@ -156,10 +296,11 @@ async def translate_srt(request: TranslateRequest):
                 data.update(extra)
             return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
-        # API 키 검증
-        api_key = os.environ.get("GEMINI_API_KEY")
-        if not api_key:
-            yield log_event("init", "error", "Gemini API 키가 설정되어 있지 않습니다. .env 파일을 작성해 주세요.")
+        # 기본 API 키 상태 (개별 청크 호출 시 각 provider의 키를 검증함)
+        gemini_key = os.environ.get("GEMINI_API_KEY")
+        openrouter_key = os.environ.get("OPENROUTER_API_KEY")
+        if not gemini_key and not openrouter_key:
+            yield log_event("init", "error", "지원되는 모델 제공자(GEMINI_API_KEY 또는 OPENROUTER_API_KEY)가 설정되어 있지 않습니다. .env 파일을 작성해 주세요.")
             return
 
         file_path = request.file_path
@@ -225,8 +366,11 @@ async def translate_srt(request: TranslateRequest):
         # ----------------------------------------------------
         # 3. 청크별 번역 루프 (기본 모델 -> 실패 시 대체 모델)
         # ----------------------------------------------------
-        client = genai.Client(api_key=api_key)
         all_translated_blocks = []
+
+        # OpenRouter 설정 읽기
+        openrouter_api_key = os.environ.get('OPENROUTER_API_KEY')
+        openrouter_base = os.environ.get('OPENROUTER_BASE_URL')
 
         for idx, chunk in enumerate(chunks):
             chunk_num = idx + 1
@@ -244,25 +388,41 @@ async def translate_srt(request: TranslateRequest):
             while api_retry < max_api_retries:
                 api_retry += 1
                 yield log_event(
-                    "translate", 
-                    "running", 
-                    f"청크 {chunk_num}/{total_chunks} 번역 요청 중 ({request.primary_model})... (시도 {api_retry}/{max_api_retries})", 
+                    "translate",
+                    "running",
+                    f"청크 {chunk_num}/{total_chunks} 번역 요청 중 ({request.primary_model} @ {request.primary_provider})... (시도 {api_retry}/{max_api_retries})",
                     percent=progress_percent,
                     extra={"chunk": chunk_num, "total_chunks": total_chunks}
                 )
-                
+
                 try:
                     loop = asyncio.get_event_loop()
-                    translated_chunk = await loop.run_in_executor(
-                        None, translate_chunk_with_gemini, client, request.primary_model, chunk
-                    )
-                    
+                    # provider별로 적절한 키/endpoint를 선택하여 호출
+                    primary_provider = (request.primary_provider or 'gemini').lower()
+                    if primary_provider == 'gemini':
+                        gemini_key = os.environ.get('GEMINI_API_KEY')
+                        if not gemini_key:
+                            raise Exception('GEMINI_API_KEY가 설정되어 있지 않습니다.')
+                        translated_chunk = await loop.run_in_executor(
+                            None, translate_chunk, 'gemini', gemini_key, None, request.primary_model, chunk
+                        )
+                    elif primary_provider == 'openrouter':
+                        or_key = os.environ.get('OPENROUTER_API_KEY')
+                        if not or_key:
+                            raise Exception('OPENROUTER_API_KEY가 설정되어 있지 않습니다.')
+                        or_base = os.environ.get('OPENROUTER_BASE_URL')
+                        translated_chunk = await loop.run_in_executor(
+                            None, translate_chunk, 'openrouter', or_key, or_base, request.primary_model, chunk
+                        )
+                    else:
+                        raise Exception(f"지원되지 않는 provider: {primary_provider}")
+
                     if verify_chunk(chunk, translated_chunk):
                         success = True
                         yield log_event(
-                            "translate", 
-                            "success_chunk", 
-                            f"청크 {chunk_num} 검증 성공 ({request.primary_model})", 
+                            "translate",
+                            "success_chunk",
+                            f"청크 {chunk_num} 검증 성공 ({request.primary_model} @ {primary_provider})",
                             percent=progress_percent,
                             extra={"chunk": chunk_num, "total_chunks": total_chunks}
                         )
@@ -270,15 +430,15 @@ async def translate_srt(request: TranslateRequest):
                     else:
                         # API 호출은 정상이었으나 검증 실패 (개수/타임스탬프 불일치)
                         yield log_event(
-                            "translate", 
-                            "warning", 
-                            f"청크 {chunk_num} 검증 실패 (개수 또는 타임스탬프 불일치).", 
+                            "translate",
+                            "warning",
+                            f"청크 {chunk_num} 검증 실패 (개수 또는 타임스탬프 불일치).",
                             percent=progress_percent,
                             extra={"chunk": chunk_num, "total_chunks": total_chunks}
                         )
                         # 즉시 루프를 빠져나와 대체 모델로 전환
                         break
-                        
+
                 except Exception as e:
                     err_msg = str(e)
                     is_retryable = False
@@ -351,37 +511,52 @@ async def translate_srt(request: TranslateRequest):
                     yield log_event(
                         "translate", 
                         "running", 
-                        f"청크 {chunk_num}/{total_chunks} 대체 모델 재시도 중 ({request.fallback_model})... (시도 {api_retry}/{max_api_retries})", 
+                                    f"청크 {chunk_num}/{total_chunks} 대체 모델 재시도 중 ({request.fallback_model} @ {request.fallback_provider})... (시도 {api_retry}/{max_api_retries})", 
                         percent=progress_percent,
                         extra={"chunk": chunk_num, "total_chunks": total_chunks}
                     )
                     
                     try:
                         loop = asyncio.get_event_loop()
-                        translated_chunk = await loop.run_in_executor(
-                            None, translate_chunk_with_gemini, client, request.fallback_model, chunk
-                        )
-                        
+                        fallback_provider = (request.fallback_provider or 'gemini').lower()
+                        if fallback_provider == 'gemini':
+                            gemini_key = os.environ.get('GEMINI_API_KEY')
+                            if not gemini_key:
+                                raise Exception('GEMINI_API_KEY가 설정되어 있지 않습니다.')
+                            translated_chunk = await loop.run_in_executor(
+                                None, translate_chunk, 'gemini', gemini_key, None, request.fallback_model, chunk
+                            )
+                        elif fallback_provider == 'openrouter':
+                            or_key = os.environ.get('OPENROUTER_API_KEY')
+                            if not or_key:
+                                raise Exception('OPENROUTER_API_KEY가 설정되어 있지 않습니다.')
+                            or_base = os.environ.get('OPENROUTER_BASE_URL')
+                            translated_chunk = await loop.run_in_executor(
+                                None, translate_chunk, 'openrouter', or_key, or_base, request.fallback_model, chunk
+                            )
+                        else:
+                            raise Exception(f"지원되지 않는 provider: {fallback_provider}")
+
                         if verify_chunk(chunk, translated_chunk):
                             success = True
                             yield log_event(
-                                "translate", 
-                                "success_chunk", 
-                                f"청크 {chunk_num} 대체 모델 번역 및 검증 성공 ({request.fallback_model})", 
+                                "translate",
+                                "success_chunk",
+                                f"청크 {chunk_num} 대체 모델 번역 및 검증 성공 ({request.fallback_model} @ {fallback_provider})",
                                 percent=progress_percent,
                                 extra={"chunk": chunk_num, "total_chunks": total_chunks}
                             )
                             break
                         else:
                             yield log_event(
-                                "translate", 
-                                "error", 
-                                f"대체 모델({request.fallback_model})에서도 청크 {chunk_num} 검증 실패 (개수/타임스탬프 불일치).", 
+                                "translate",
+                                "error",
+                                f"대체 모델({request.fallback_model})에서도 청크 {chunk_num} 검증 실패 (개수/타임스탬프 불일치).",
                                 percent=progress_percent,
                                 extra={"chunk": chunk_num, "total_chunks": total_chunks}
                             )
                             return # 최종 실패
-                            
+
                     except Exception as e:
                         err_msg = str(e)
                         is_retryable = False

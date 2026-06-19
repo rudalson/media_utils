@@ -25,8 +25,14 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const toastArea = document.getElementById('toast-area');
 
-    // Available Gemini Models
-    const primaryModels = [
+    // Providers and Models
+    const providers = [
+        { value: 'gemini', text: 'Gemini' },
+        { value: 'openrouter', text: 'OpenRouter' }
+    ];
+
+    // Gemini model presets (shown when provider == gemini)
+    const geminiPrimaryModels = [
         { value: 'gemini-3.5-flash', text: 'Gemini 3.5 Flash' },
         { value: 'gemini-2.5-flash', text: 'Gemini 2.5 Flash' },
         { value: 'gemini-2.0-flash', text: 'Gemini 2.0 Flash' },
@@ -36,13 +42,50 @@ document.addEventListener('DOMContentLoaded', () => {
         { value: 'gemini-1.5-pro', text: 'Gemini 1.5 Pro' }
     ];
 
-    const fallbackModels = [
+    const geminiFallbackModels = [
         { value: 'gemini-3.1-pro-preview', text: 'Gemini 3.1 Pro (Preview)' },
         { value: 'gemini-2.5-pro', text: 'Gemini 2.5 Pro' },
         { value: 'gemini-3.5-flash', text: 'Gemini 3.5 Flash' },
         { value: 'gemini-2.5-flash', text: 'Gemini 2.5 Flash' },
         { value: 'gemini-1.5-pro', text: 'Gemini 1.5 Pro' }
     ];
+
+    // Helper to create a provider select element
+    function createProviderSelect(defaultValue = 'gemini') {
+        const sel = document.createElement('select');
+        sel.className = 'provider-select';
+        providers.forEach(p => {
+            const o = document.createElement('option');
+            o.value = p.value;
+            o.textContent = p.text;
+            sel.appendChild(o);
+        });
+        sel.value = defaultValue;
+        return sel;
+    }
+
+    // Helper to create a model control (select for Gemini, input for OpenRouter)
+    function createModelControl(provider, defaultModel = '') {
+        if (provider === 'gemini') {
+            const s = document.createElement('select');
+            s.className = 'model-select';
+            geminiPrimaryModels.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.value;
+                opt.textContent = m.text;
+                s.appendChild(opt);
+            });
+            if (defaultModel) s.value = defaultModel;
+            return s;
+        } else {
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'model-input';
+            input.placeholder = 'OpenRouter model (e.g. gpt-4o-mini)';
+            if (defaultModel) input.value = defaultModel;
+            return input;
+        }
+    }
 
     // Initialization
     checkApiKeyStatus();
@@ -69,15 +112,19 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await fetch('/api/key_status');
             const data = await res.json();
-            
+
             keyStatusBadge.className = 'status-badge';
-            if (data.configured) {
+            keyStatusBadge.classList.remove('status-configured','status-missing','status-loading');
+            const parts = [];
+            if (data.gemini) parts.push('Gemini ✓');
+            if (data.openrouter) parts.push('OpenRouter ✓');
+            if (parts.length) {
                 keyStatusBadge.classList.add('status-configured');
-                keyStatusBadge.querySelector('.badge-text').textContent = 'Gemini API 연결됨';
+                keyStatusBadge.querySelector('.badge-text').textContent = parts.join(' | ');
             } else {
                 keyStatusBadge.classList.add('status-missing');
                 keyStatusBadge.querySelector('.badge-text').textContent = 'API 키 유실 (.env)';
-                showToast('Gemini API 키가 설정되지 않았습니다. .env 파일을 작성해 주세요!', 'error');
+                showToast('지원되는 모델 제공자(Gemini 또는 OpenRouter) API 키가 설정되지 않았습니다. .env 파일을 작성해 주세요!', 'error');
             }
         } catch (e) {
             console.error('API Key check error:', e);
@@ -190,25 +237,14 @@ document.addEventListener('DOMContentLoaded', () => {
             // 파일 크기 포맷팅 (KB)
             const sizeKB = (file.size_bytes / 1024).toFixed(1);
             
-            // Primary Model Select Build
-            const primSelect = document.createElement('select');
-            primSelect.className = 'model-select';
-            primaryModels.forEach(m => {
-                const opt = document.createElement('option');
-                opt.value = m.value;
-                opt.textContent = m.text;
-                primSelect.appendChild(opt);
-            });
+            // Primary Provider + Model Control
+            const primProviderSelect = createProviderSelect('gemini');
+            const primModelControl = createModelControl(primProviderSelect.value);
 
-            // Fallback Model Select Build
-            const fbSelect = document.createElement('select');
-            fbSelect.className = 'model-select';
-            fallbackModels.forEach(m => {
-                const opt = document.createElement('option');
-                opt.value = m.value;
-                opt.textContent = m.text;
-                fbSelect.appendChild(opt);
-            });
+            // Fallback Provider + Model Control
+            const fbProviderSelect = createProviderSelect('gemini');
+            const fbModelControl = createModelControl(fbProviderSelect.value);
+
 
             // Action Button
             const actionBtn = document.createElement('button');
@@ -219,7 +255,17 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             
             actionBtn.addEventListener('click', () => {
-                startTranslation(file.path, file.filename, primSelect.value, fbSelect.value);
+                // gather primary provider/model
+                const primProvider = primProviderSelect.value;
+                const fbProvider = fbProviderSelect.value;
+                let primModel = '';
+                let fbModel = '';
+                const primControl = primWrapper.querySelector('.model-select, .model-input');
+                const fbControl = fbWrapper.querySelector('.model-select, .model-input');
+                if (primControl) primModel = primControl.value || primControl.textContent || '';
+                if (fbControl) fbModel = fbControl.value || fbControl.textContent || '';
+
+                startTranslation(file.path, file.filename, primModel, fbModel, primProvider, fbProvider);
             });
 
             // Appending Cells
@@ -236,11 +282,36 @@ document.addEventListener('DOMContentLoaded', () => {
             tdBlocks.innerHTML = `${file.block_count} <span class="badge-info" style="margin-left:5px;">${file.estimated_chunks} 청크</span>`;
             
             const tdPrim = document.createElement('td');
-            tdPrim.appendChild(primSelect);
-            
+            // provider select + model control container
+            const primWrapper = document.createElement('div');
+            primWrapper.style.display = 'flex';
+            primWrapper.style.gap = '6px';
+            primWrapper.appendChild(primProviderSelect);
+            primWrapper.appendChild(primModelControl);
+            tdPrim.appendChild(primWrapper);
+
             const tdFb = document.createElement('td');
-            tdFb.appendChild(fbSelect);
-            
+            const fbWrapper = document.createElement('div');
+            fbWrapper.style.display = 'flex';
+            fbWrapper.style.gap = '6px';
+            fbWrapper.appendChild(fbProviderSelect);
+            fbWrapper.appendChild(fbModelControl);
+            tdFb.appendChild(fbWrapper);
+
+            // After wrappers exist, attach provider change listeners to swap inner control
+            primProviderSelect.addEventListener('change', () => {
+                const newControl = createModelControl(primProviderSelect.value);
+                const old = primWrapper.querySelector('.model-select, .model-input');
+                if (old) primWrapper.replaceChild(newControl, old);
+                else primWrapper.appendChild(newControl);
+            });
+            fbProviderSelect.addEventListener('change', () => {
+                const newControl = createModelControl(fbProviderSelect.value);
+                const old = fbWrapper.querySelector('.model-select, .model-input');
+                if (old) fbWrapper.replaceChild(newControl, old);
+                else fbWrapper.appendChild(newControl);
+            });
+
             const tdAction = document.createElement('td');
             tdAction.className = 'text-center';
             tdAction.appendChild(actionBtn);
@@ -272,17 +343,19 @@ document.addEventListener('DOMContentLoaded', () => {
         progressModal.classList.add('active');
 
         try {
-            const response = await fetch('/api/translate', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    file_path: filePath,
-                    primary_model: primaryModel,
-                    fallback_model: fallbackModel
-                })
-            });
+                    const response = await fetch('/api/translate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        file_path: filePath,
+                        primary_model: primaryModel,
+                        fallback_model: fallbackModel,
+                        primary_provider: primaryProvider,
+                        fallback_provider: fallbackProvider
+                    })
+                });
 
             if (!response.ok) {
                 throw new Error('번역 요청 전송 실패');
@@ -292,13 +365,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const decoder = new TextDecoder('utf-8');
             let buffer = '';
 
-            while (true) {
+                while (true) {
                 const { value, done } = await reader.read();
                 if (done) break;
 
                 buffer += decoder.decode(value, { stream: true });
                 const lines = buffer.split('\n');
-                
+
                 // 마지막 줄이 미완성일 수 있으므로 버퍼에 보관
                 buffer = lines.pop();
 
@@ -346,7 +419,8 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (step === 'pre_process') stepLabel = '번역 전처리 (pre_srt)';
         else if (step === 'chunking') stepLabel = '자막 청크 분할';
         else if (step === 'translate') {
-            stepLabel = `Gemini 자막 번역 (청크 ${event.chunk}/${event.total_chunks})`;
+            // Generic translation label — provider/model info is shown in the event message
+            stepLabel = `자막 번역 (청크 ${event.chunk}/${event.total_chunks})`;
         }
         else if (step === 'save') stepLabel = '한글 자막 임시 저장';
         else if (step === 'verify') stepLabel = '자막 최종 정합성 검증';

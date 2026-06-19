@@ -406,6 +406,31 @@ button {
     color: var(--text-primary);
 }
 
+/* Provider select and freeform model input */
+.provider-select {
+    background: rgba(0, 0, 0, 0.35);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    padding: 0.35rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-family: var(--font-sans);
+    outline: none;
+    cursor: pointer;
+    width: 100px;
+}
+
+.model-input {
+    background: rgba(0, 0, 0, 0.35);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    padding: 0.45rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    width: 180px;
+    outline: none;
+}
+
 .empty-state {
     text-align: center !important;
     padding: 5rem 0 !important;
