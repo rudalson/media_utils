@@ -36,7 +36,15 @@ def process_srt(directory):
             # 2. 문장 시작 추임새 삭제
             content = p2.sub('', content)
             
-            new_filename = f"_{srt_path.name}"
+            stem = srt_path.stem
+            # 파일명 끝의 ' (ko)' (대소문자 무관, 앞의 공백 포함) 패턴 제거
+            new_stem = re.sub(r'\s*\([kK][oO]\)$', '', stem)
+            
+            if new_stem != stem:
+                new_filename = f"{new_stem}{srt_path.suffix}"
+            else:
+                new_filename = f"_{srt_path.name}"
+            
             new_path = srt_path.parent / new_filename
 
             with open(new_path, 'w', encoding='utf-8') as f:
