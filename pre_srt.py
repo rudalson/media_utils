@@ -85,12 +85,15 @@ def process_file(file_path, remove_targets):
 
 def main():
     if len(sys.argv) < 2:
-        print("사용법: python pre_srt.py [디렉토리_경로]")
-        return
-
-    raw_path = " ".join(sys.argv[1:])
-    target_dir = raw_path.strip().strip('"').strip("'")
-    if target_dir.endswith('\\'): target_dir = target_dir[:-1]
+        target_dir = os.getcwd()
+    else:
+        raw_path = " ".join(sys.argv[1:])
+        target_dir = raw_path.strip().strip('"').strip("'")
+        if target_dir.endswith('\\'): target_dir = target_dir[:-1]
+        if not target_dir:
+            target_dir = os.getcwd()
+        else:
+            target_dir = os.path.abspath(target_dir)
 
     if not os.path.isdir(target_dir):
         print(f"오류: '{target_dir}'은(는) 유효한 디렉토리가 아닙니다.")

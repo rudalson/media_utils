@@ -3,7 +3,7 @@ import re
 import argparse
 from pathlib import Path
 
-def process_srt(directory):
+def process_srt(directory="."):
     # 패턴 1: 문장 부호 뒤의 확인성 어미 정리
     # 마지막에 '?'를 제거하여 [.\?] 즉, 마침표나 물음표가 반드시 뒤따를 때만 매칭되도록 수정했습니다.
     # 이렇게 하면 ', 여러분도'나 ', 아시겠죠라고' 처럼 뒤에 조사가 붙는 경우는 건너뜁니다.
@@ -13,10 +13,12 @@ def process_srt(directory):
     # (?<!\S)는 줄의 시작이나 공백 뒤에서만 작동합니다.
     p2 = re.compile(r'(?<!\S)(어|음|네),\s*')
 
-    path = Path(directory)
+    path = Path(directory).resolve()
     if not path.exists() or not path.is_dir():
         print(f"Error: '{directory}'는 유효한 디렉토리가 아닙니다.")
         return
+
+    print(f"작업 디렉토리: {path}")
 
     srt_files = list(path.glob('*.srt'))
     if not srt_files:
@@ -57,7 +59,12 @@ def process_srt(directory):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="자막 파일 추임새 정리 스크립트")
-    parser.add_argument("directory", help="srt 파일들이 들어있는 디렉토리 경로")
+    parser.add_argument(
+        "directory",
+        nargs="?",
+        default=".",
+        help="srt 파일들이 들어있는 디렉토리 경로 (지정하지 않을 경우 현재 디렉토리)"
+    )
     
     args = parser.parse_args()
     process_srt(args.directory)
