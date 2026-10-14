@@ -670,47 +670,14 @@ async def translate_srt(request: TranslateRequest):
         await asyncio.sleep(0.1)
 
         try:
-            # post_srt 실행 전 디렉토리의 기존 fixed_*.srt 파일 리스트 기록
-            existing_fixed = {
-                f for f in os.listdir(directory) if f.startswith("fixed_") and f.endswith(".srt")
-            }
-
-            # post_srt의 process_srt는 디렉토리를 통째로 후처리
-            # 디렉토리 내의 모든 .srt 파일에 대해 fixed_ 파일들을 생성
+            # post_srt를 번역 결과 파일에 직접 실행하여 제자리(in-place) 정제 수행
             loop = asyncio.get_event_loop()
-            await loop.run_in_executor(None, post_srt.process_srt, directory)
-
-            # 생성된 fixed_a (kr).srt 확인 및 덮어쓰기
-            fixed_kr_filename = f"fixed_{base} (kr){ext}"
-            fixed_kr_path = os.path.join(directory, fixed_kr_filename)
-
-            if os.path.exists(fixed_kr_path):
-                # 기존 a (kr).srt 삭제 후 이름 변경하여 덮어쓰기
-                if os.path.exists(kr_file_path):
-                    os.remove(kr_file_path)
-                os.rename(fixed_kr_path, kr_file_path)
-            else:
-                yield log_event("post_process", "error", f"후처리 결과 파일을 찾을 수 없습니다: {fixed_kr_filename}")
-                return
-
-            # 이번 작업으로 새롭게 생긴 불필요한 fixed_*.srt 파일들 정리
-            # (예: fixed_a.srt, fixed_a_pre.srt)
-            for item in os.listdir(directory):
-                if (item.startswith("fixed_") and 
-                    item.endswith(".srt") and 
-                    item not in existing_fixed and 
-                    item != fixed_kr_filename):
-                    
-                    try:
-                        os.remove(os.path.join(directory, item))
-                    except Exception:
-                        pass
-
+            await loop.run_in_executor(None, post_srt.process_srt, kr_file_path)
         except Exception as e:
             yield log_event("post_process", "error", f"후처리 실행 중 오류 발생: {str(e)}")
             return
 
-        yield log_event("post_process", "success", "후처리 완료 및 최종본 덮어쓰기 성공.", percent=98)
+        yield log_event("post_process", "success", "후처리 완료 및 최종본 저장 성공.", percent=98)
         await asyncio.sleep(0.1)
 
         # ----------------------------------------------------

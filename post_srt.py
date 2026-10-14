@@ -3,7 +3,7 @@ import re
 import argparse
 from pathlib import Path
 
-def process_srt(directory="."):
+def process_srt(target="."):
     # 패턴 1: 문장 부호 뒤의 확인성 어미 정리
     # 마지막에 '?'를 제거하여 [.\?] 즉, 마침표나 물음표가 반드시 뒤따를 때만 매칭되도록 수정했습니다.
     # 이렇게 하면 ', 여러분도'나 ', 아시겠죠라고' 처럼 뒤에 조사가 붙는 경우는 건너뜁니다.
@@ -13,23 +13,32 @@ def process_srt(directory="."):
     # (?<!\S)는 줄의 시작이나 공백 뒤에서만 작동합니다.
     p2 = re.compile(r'(?<!\S)(어|음|네),\s*')
 
-    path = Path(directory).resolve()
-    if not path.exists() or not path.is_dir():
-        print(f"Error: '{directory}'는 유효한 디렉토리가 아닙니다.")
+    path = Path(target).resolve()
+    if not path.exists():
+        print(f"Error: '{target}'는 유효한 디렉토리 또는 파일이 아닙니다.")
         return
 
-    print(f"작업 디렉토리: {path}")
-
-    srt_files = list(path.glob('*.srt'))
-    if not srt_files:
-        print("처리할 .srt 파일이 없습니다.")
+    if path.is_file():
+        if path.suffix.lower() != '.srt':
+            print(f"Error: '{target}'는 .srt 파일이 아닙니다.")
+            return
+        srt_files = [path]
+        print(f"작업 파일: {path}")
+    elif path.is_dir():
+        print(f"작업 디렉토리: {path}")
+        srt_files = [f for f in path.iterdir() if f.is_file() and f.suffix.lower() == '.srt']
+        if not srt_files:
+            print("처리할 .srt 파일이 없습니다.")
+            return
+    else:
+        print(f"Error: '{target}'는 유효한 디렉토리 또는 파일이 아닙니다.")
         return
 
     print(f"총 {len(srt_files)}개의 파일을 찾았습니다. 정제 작업을 시작합니다...")
 
     for srt_path in srt_files:
         try:
-            with open(srt_path, 'r', encoding='utf-8') as f:
+            with open(srt_path, 'r', encoding='utf-8-sig') as f:
                 content = f.read()
 
             # 1. ', 여러분.' -> '.' 형태로 변환 (요청하신 대로 뒤에 문장 부호가 있을 때만 작동)
@@ -37,19 +46,9 @@ def process_srt(directory="."):
 
             # 2. 문장 시작 추임새 삭제
             content = p2.sub('', content)
-            
-            stem = srt_path.stem
-            # 파일명 끝의 ' (ko)' (대소문자 무관, 앞의 공백 포함) 패턴 제거
-            new_stem = re.sub(r'\s*\([kK][oO]\)$', '', stem)
-            
-            if new_stem != stem:
-                new_filename = f"{new_stem}{srt_path.suffix}"
-            else:
-                new_filename = f"_{srt_path.name}"
-            
-            new_path = srt_path.parent / new_filename
 
-            with open(new_path, 'w', encoding='utf-8') as f:
+            # 파일명을 변경하지 않고 input 파일명 그대로 덮어쓰기 저장
+            with open(srt_path, 'w', encoding='utf-8') as f:
                 f.write(content)
             
             print(f"[OK] 완료: {srt_path.name}")
@@ -60,11 +59,11 @@ def process_srt(directory="."):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="자막 파일 추임새 정리 스크립트")
     parser.add_argument(
-        "directory",
+        "target",
         nargs="?",
         default=".",
-        help="srt 파일들이 들어있는 디렉토리 경로 (지정하지 않을 경우 현재 디렉토리)"
+        help="srt 파일 또는 srt 파일들이 들어있는 디렉토리 경로 (지정하지 않을 경우 현재 디렉토리)"
     )
     
     args = parser.parse_args()
-    process_srt(args.directory)
+    process_srt(args.target)
