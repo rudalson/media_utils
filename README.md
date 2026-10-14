@@ -44,7 +44,7 @@ GEMINI_API_KEY=AIzaSyYourGeminiApiKeyHere...
 웹 서비스 없이 개별 Python 스크립트들을 터미널에서 단독으로 유연하게 실행할 수 있습니다.
 
 ### 1. 자막 전처리 스크립트 (`pre_srt.py`)
-지정한 디렉토리 내의 모든 영어 자막 파일(.srt)을 일괄 전처리하여 `*_pre.srt` 파일을 생성합니다. 경로를 지정하지 않으면 현재 디렉토리가 기본값으로 지정됩니다.
+지정한 디렉토리 내의 모든 영어 자막 파일(.srt)을 일괄 전처리하여 `* (en).srt` 파일을 생성합니다. 경로를 지정하지 않으면 현재 디렉토리가 기본값으로 지정됩니다.
 ```bash
 python pre_srt.py [로컬_디렉토리_경로]
 # 경로를 생략하면 현재 디렉토리 기준으로 실행됩니다.
@@ -54,7 +54,7 @@ python pre_srt.py
 ### 2. 1:1 자막 싱크 검증 스크립트 (`verify_srt.py`)
 전처리 원본 자막과 번역본 자막의 모든 인덱스 번호 및 타임스탬프 싱크가 100% 일치하는지 비교합니다.
 ```bash
-python verify_srt.py [원본_pre.srt] [번역_kr.srt]
+python verify_srt.py [원본 (en).srt] [번역 (kr).srt]
 ```
 *(검증 통과 시 Exit Code `0`, 불일치/에러 발생 시 Exit Code `1`과 에러 내용을 반환합니다.)*
 

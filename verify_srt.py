@@ -82,7 +82,7 @@ def verify_srt_files(pre_file_path, kr_file_path):
 
 def main():
     if len(sys.argv) < 3:
-        print("사용법: python verify_srt.py [원본_pre.srt 경로] [번역_kr.srt 경로]")
+        print("사용법: python verify_srt.py [원본 (en).srt 경로] [번역 (kr).srt 경로]")
         sys.exit(1)
 
     pre_file = sys.argv[1]

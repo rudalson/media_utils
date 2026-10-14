@@ -52,7 +52,9 @@ def merge_logic(blocks):
 
 def process_file(file_path, remove_targets):
     """개별 파일 처리"""
-    if file_path.endswith('_pre.srt'): return False
+    lower_path = file_path.lower()
+    if lower_path.endswith(' (en).srt') or lower_path.endswith('_pre.srt'):
+        return False
     try:
         with open(file_path, 'r', encoding='utf-8-sig') as f:
             content = f.read()
@@ -73,7 +75,7 @@ def process_file(file_path, remove_targets):
         final_blocks = merge_logic(parsed_blocks)
 
         base, ext = os.path.splitext(file_path)
-        output_path = f"{base}_pre{ext}"
+        output_path = f"{base} (en){ext}"
         with open(output_path, 'w', encoding='utf-8') as f:
             for block in final_blocks:
                 f.write(f"{block['index']}\n{block['start']} --> {block['end']}\n{block['text']}\n\n")
@@ -108,8 +110,12 @@ def main():
     # os.walk 대신 os.listdir을 사용하여 지정된 폴더 내부만 확인
     for item in os.listdir(target_dir):
         file_path = os.path.join(target_dir, item)
-        # 폴더가 아닌 파일이면서 .srt인 경우만 처리
-        if os.path.isfile(file_path) and item.lower().endswith(".srt") and not item.endswith("_pre.srt"):
+        # 폴더가 아닌 파일이면서 .srt인 경우만 처리 (이미 전처리된 (en) 및 _pre 파일 제외)
+        lower_item = item.lower()
+        if (os.path.isfile(file_path) and 
+            lower_item.endswith(".srt") and 
+            not lower_item.endswith(" (en).srt") and 
+            not lower_item.endswith("_pre.srt")):
             if process_file(file_path, remove_targets):
                 success_count += 1
 

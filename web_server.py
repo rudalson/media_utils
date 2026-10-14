@@ -63,10 +63,11 @@ def scan_directory(directory: str = Query(..., description="스캔할 로컬 디
     try:
         for item in os.listdir(directory):
             full_path = os.path.join(directory, item)
-            # 파일이고 확장자가 .srt이되, 전처리 파일(_pre)이나 번역본((kr)), 후처리본(fixed_)은 제외
+            # 파일이고 확장자가 .srt이되, 전처리 파일(_pre, (en))이나 번역본((kr)), 후처리본(fixed_)은 제외
             if (os.path.isfile(full_path) and 
                 item.lower().endswith(".srt") and 
                 not item.endswith("_pre.srt") and 
+                not item.endswith(" (en).srt") and 
                 " (kr)" not in item and 
                 not item.startswith("fixed_")):
                 
@@ -332,10 +333,14 @@ async def translate_srt(request: TranslateRequest):
             yield log_event("pre_process", "error", f"전처리 실행 중 예외 발생: {str(e)}")
             return
 
-        pre_file_path = f"{os.path.join(directory, base)}_pre{ext}"
+        pre_file_path = f"{os.path.join(directory, base)} (en){ext}"
         if not os.path.exists(pre_file_path):
-            yield log_event("pre_process", "error", f"전처리 파일 생성 확인 실패: {pre_file_path}")
-            return
+            fallback_pre = f"{os.path.join(directory, base)}_pre{ext}"
+            if os.path.exists(fallback_pre):
+                pre_file_path = fallback_pre
+            else:
+                yield log_event("pre_process", "error", f"전처리 파일 생성 확인 실패: {pre_file_path}")
+                return
 
         yield log_event("pre_process", "success", f"전처리 완료: {os.path.basename(pre_file_path)} 생성됨.", percent=20)
         await asyncio.sleep(0.1)
